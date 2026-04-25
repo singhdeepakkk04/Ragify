@@ -1,0 +1,42 @@
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * 1"
+
+jobs:
+  python-sast:
+    name: Bandit SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install bandit[toml]
+      - run: bandit -r backend/app/ -c backend/pyproject.toml --severity-level medium --confidence-level medium || true
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit && pip-audit -r backend/requirements.txt || true
+      - working-directory: frontend
+        run: npm audit --audit-level=high || true
+
+  secret-scan:
+    name: GitLeaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

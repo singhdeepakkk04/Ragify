@@ -1,0 +1,131 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-serif);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+:root {
+  /* Ultra-sleek, high-contrast monochrome light theme */
+  --background: #ffffff;
+  --foreground: #09090b; /* Zinc 950 */
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  
+  /* Primary is pure black */
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary and muted are cool grays */
+  --secondary: #f4f4f5; /* Zinc 100 */
+  --secondary-foreground: #18181b; /* Zinc 900 */
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a; /* Zinc 500 */
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  
+  --border: #e4e4e7; /* Zinc 200 */
+  --input: #e4e4e7;
+  --ring: #09090b;
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* Deep, pure monochrome dark theme */
+  --background: #000000; /* Pure Black */
+  --foreground: #ffffff;
+  --card: #09090b; /* Zinc 950 */
+  --card-foreground: #ffffff;
+  --popover: #09090b;
+  --popover-foreground: #ffffff;
+  
+  /* Primary is pure white */
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  
+  --secondary: #27272a; /* Zinc 800 */
+  --secondary-foreground: #ffffff;
+  --muted: #18181b; /* Zinc 900 */
+  --muted-foreground: #a1a1aa; /* Zinc 400 */
+  --accent: #27272a;
+  --accent-foreground: #ffffff;
+  
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-foreground selection:text-background;
+  }
+}
+
+/* Custom Animation Utilities for the Monochrome Redesign */
+@layer utilities {
+  .bg-grid-white {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  }
+  .bg-grid-black {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

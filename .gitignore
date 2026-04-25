@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+ENV/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+backend/backend.log
+frontend/frontend.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# Mypy / Ruff
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# IDEs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+
+# Security scan artifacts
+bandit-report.json
+trivy-results.sarif
+pip-audit-report.json
+npm-audit-report.json

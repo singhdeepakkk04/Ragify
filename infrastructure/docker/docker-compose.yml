@@ -1,0 +1,62 @@
+services:
+  # ── RAGify Core Services ─────────────────────────────────────────────────────
+  # NOTE: Ollama is used natively (not in Docker) for Apple Silicon GPU acceleration.
+  # Install: brew install ollama  |  Pull model: ollama pull qwen2.5:0.5b
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ragify-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ragify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ragify_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ragify_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ragify -d ragify_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: ragify-redis
+    restart: unless-stopped
+    command: >
+      sh -c '
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          redis-server --requirepass "$$REDIS_PASSWORD"
+        else
+          redis-server
+        fi
+      '
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+-a $$REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db_net
+
+networks:
+  db_net:
+    driver: bridge
+
+volumes:
+  # RAGify volumes
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
