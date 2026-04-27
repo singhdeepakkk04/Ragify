@@ -3,6 +3,7 @@ export function getRecommendation(answers: any) {
     // Start with sensible defaults
     let config: any = {
         llm_model: "gpt-3.5-turbo",
+        embedding_provider: "openai",
         embedding_model: "text-embedding-3-small",
         temperature: 0.3,
         chunk_size: 1000,
@@ -60,7 +61,7 @@ export function getRecommendation(answers: any) {
     // ── 4. Accuracy vs Speed → base model selection ──
     switch (answers.accuracy) {
         case "speed":
-            config.llm_model = "groq-llama3"
+            config.llm_model = "groq-llama-3.1-8b"
             break
         case "balanced":
             config.llm_model = "gpt-4o-mini"
@@ -86,7 +87,7 @@ export function getRecommendation(answers: any) {
             break
         case "confidential":
             config.deployment_environment = "production"
-            if (config.llm_model === "groq-llama3" || config.llm_model === "groq-mixtral") {
+            if (config.llm_model === "groq-llama-3.1-8b" || config.llm_model === "groq-mixtral-8x7b") {
                 config.llm_model = "gpt-4o-mini"
             }
             break
@@ -102,7 +103,7 @@ export function getRecommendation(answers: any) {
             break
         case "creative":
             config.temperature = 0.7
-            if (config.llm_model === "groq-llama3") {
+            if (config.llm_model === "groq-llama-3.1-8b") {
                 config.llm_model = "gpt-4o-mini"
             }
             break
@@ -112,8 +113,9 @@ export function getRecommendation(answers: any) {
     switch (answers.budget) {
         case "free":
             if (config.llm_model === "gpt-4-turbo" || config.llm_model === "gpt-4o-mini") {
-                config.llm_model = "groq-mixtral"
+                config.llm_model = "groq-mixtral-8x7b"
             }
+            config.embedding_provider = "openai"
             config.embedding_model = "text-embedding-3-small"
             break
         case "moderate":
@@ -127,6 +129,13 @@ export function getRecommendation(answers: any) {
             break
     }
 
+    // ── Optional: Gemini embeddings (storage-optimized) ──
+    // If you have a lot of documents, Gemini embeddings are smaller (768-dim) and cheaper to store.
+    if (answers.volume === "large" && answers.budget !== "premium") {
+        config.embedding_provider = "gemini"
+        config.embedding_model = "gemini-embedding-2-preview"
+    }
+
     // ── 9. Language-aware model adjustment ──
     // Only override to Sarvam if language is PURELY Indian (not multilingual)
     if (answers.language === "indian") {
@@ -138,7 +147,7 @@ export function getRecommendation(answers: any) {
     } else if (answers.language === "multilingual") {
         // Multilingual (mixed) → GPT-4o Mini handles many languages well
         // Only suggest it if currently on a weaker model
-        if (config.llm_model === "gpt-3.5-turbo" || config.llm_model === "groq-llama3") {
+        if (config.llm_model === "gpt-3.5-turbo" || config.llm_model === "groq-llama-3.1-8b") {
             config.llm_model = "gpt-4o-mini"
         }
         config._model_reason = "GPT-4o Mini recommended for strong multilingual support across many languages"
@@ -150,8 +159,10 @@ export function getRecommendation(answers: any) {
         "gpt-4o-mini": "Best balance of quality, speed, and cost",
         "gpt-4-turbo": "Most capable — best for complex reasoning and accuracy",
         "sarvam-m": "Purpose-built for Indian languages (Hindi, Tamil, Telugu, etc.)",
-        "groq-llama3": "Blazing fast free inference via Groq",
-        "groq-mixtral": "Free 32K context — great for large document RAG on a budget",
+        "groq-llama-3.1-8b": "Blazing fast free inference via Groq",
+        "groq-mixtral-8x7b": "Free 32K context — great for large document RAG on a budget",
+        "gemini-2.5-flash": "Fast Gemini model — good for low-latency reasoning",
+        "gemini-2.5-pro": "Most capable Gemini model — best for complex reasoning",
     }
     if (!config._model_reason) {
         config._model_reason = MODEL_REASONS[config.llm_model] || ""

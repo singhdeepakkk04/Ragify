@@ -10,12 +10,16 @@ class ProjectBase(BaseModel):
     # Advanced Config
     llm_model: Optional[str] = "gpt-3.5-turbo"
     embedding_model: Optional[str] = "text-embedding-3-small"
+    embedding_provider: Optional[str] = "openai"
     temperature: Optional[float] = 0.0
     chunk_size: Optional[int] = 1000
     chunk_overlap: Optional[int] = 200
     top_k: Optional[int] = 4
     deployment_environment: Optional[str] = "dev"
     is_public: Optional[bool] = False
+    retrieval_strategy: Optional[str] = "balanced"
+    allow_errors: Optional[bool] = False
+    enable_web_search: Optional[bool] = False
     
     config: Optional[Dict[str, Any]] = None
 
@@ -28,12 +32,16 @@ class ProjectUpdate(BaseModel):
     project_type: Optional[str] = None
     llm_model: Optional[str] = None
     embedding_model: Optional[str] = None
+    embedding_provider: Optional[str] = None
     temperature: Optional[float] = None
     chunk_size: Optional[int] = None
     chunk_overlap: Optional[int] = None
     top_k: Optional[int] = None
     deployment_environment: Optional[str] = None
     is_public: Optional[bool] = None
+    retrieval_strategy: Optional[str] = None
+    allow_errors: Optional[bool] = None
+    enable_web_search: Optional[bool] = None
     config: Optional[Dict[str, Any]] = None
 
 class ProjectInDBBase(ProjectBase):

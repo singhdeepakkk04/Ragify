@@ -157,16 +157,28 @@ export default function NewProjectPage() {
                                         <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Sarvam AI · Indian Languages</span>
                                     </div>
                                 </SelectItem>
-                                <SelectItem value="groq-llama3">
+                                <SelectItem value="groq-llama-3.1-8b">
                                     <div className="flex items-center gap-2">
-                                        <span>Llama 3 70B</span>
+                                        <span>Llama 3.1 8B</span>
                                         <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">Groq · Free</span>
                                     </div>
                                 </SelectItem>
-                                <SelectItem value="groq-mixtral">
+                                <SelectItem value="groq-mixtral-8x7b">
                                     <div className="flex items-center gap-2">
                                         <span>Mixtral 8x7B</span>
                                         <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">Groq · Free · 32K Context</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="gemini-2.5-flash">
+                                    <div className="flex items-center gap-2">
+                                        <span>Gemini 2.5 Flash</span>
+                                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Gemini · Moderate</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="gemini-2.5-pro">
+                                    <div className="flex items-center gap-2">
+                                        <span>Gemini 2.5 Pro</span>
+                                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Gemini · Expensive</span>
                                     </div>
                                 </SelectItem>
                             </SelectContent>

@@ -98,6 +98,18 @@ MODELS: dict[str, ModelInfo] = {
         cost_tier="free",
     ),
 
+    "groq-mixtral-8x7b": ModelInfo(
+        id="groq-mixtral-8x7b",
+        name="Mixtral 8x7B (Groq)",
+        provider="groq",
+        model_name="mixtral-8x7b-32768",
+        base_url="https://api.groq.com/openai/v1",
+        api_key_env="GROQ_API_KEY",
+        description="Strong MoE model with 32K context. Great RAG value.",
+        context_window=32768,
+        cost_tier="free",
+    ),
+
     # ── ZhipuAI (GLM) ──
     "glm-4": ModelInfo(
         id="glm-4",
@@ -156,7 +168,43 @@ MODELS: dict[str, ModelInfo] = {
         context_window=64000,
         cost_tier="moderate",
     ),
+
+    # ── Google Gemini (native via google-genai) ──
+    "gemini-2.5-flash": ModelInfo(
+        id="gemini-2.5-flash",
+        name="Gemini 2.5 Flash",
+        provider="gemini",
+        model_name="gemini-2.5-flash",
+        base_url=None,
+        api_key_env="GEMINI_API_KEY",
+        description="Fast Gemini model. Good for low-latency RAG.",
+        context_window=1000000,
+        cost_tier="moderate",
+    ),
+    "gemini-2.5-pro": ModelInfo(
+        id="gemini-2.5-pro",
+        name="Gemini 2.5 Pro",
+        provider="gemini",
+        model_name="gemini-2.5-pro",
+        base_url=None,
+        api_key_env="GEMINI_API_KEY",
+        description="Most capable Gemini model. Best for complex reasoning.",
+        context_window=2000000,
+        cost_tier="expensive",
+    ),
 }
+
+
+# Backward-compatible aliases (old UI/model ids)
+MODEL_ALIASES: dict[str, str] = {
+    "groq-llama3": "groq-llama-3.3-70b",
+    "groq-mixtral": "groq-mixtral-8x7b",
+}
+
+
+def resolve_model_id(model_id: str) -> str:
+    """Map legacy model ids to current ids."""
+    return MODEL_ALIASES.get(model_id, model_id)
 
 
 def get_available_models() -> list[dict]:
@@ -181,6 +229,7 @@ def get_llm_for_model(model_id: str, temperature: float = 0.0) -> ChatOpenAI:
     Create a LangChain ChatOpenAI instance for the given model.
     Works with any OpenAI-compatible provider (Sarvam, Groq, etc).
     """
+    model_id = resolve_model_id(model_id)
     info = MODELS.get(model_id)
     if not info:
         # Fallback to GPT-3.5-turbo

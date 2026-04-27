@@ -1,8 +1,13 @@
 import axios from 'axios';
 import { createClient } from './supabase';
 
+function getApiV1BaseUrl(): string {
+    const raw = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+    return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`;
+}
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+    baseURL: getApiV1BaseUrl(),
     headers: {
         'Content-Type': 'application/json',
     },

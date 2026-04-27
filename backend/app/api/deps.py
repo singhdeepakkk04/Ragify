@@ -118,6 +118,28 @@ def _decode_supabase_jwt(token: str) -> Optional[dict]:
     return None
 
 
+def get_supabase_user_id_from_request(request: Request) -> Optional[str]:
+    """Best-effort extraction of Supabase auth user UUID (JWT `sub`).
+
+    Returns None for API-key auth, missing/invalid tokens, or when SUPABASE_* is
+    not configured.
+    """
+
+    auth = (request.headers.get("Authorization") or "").strip()
+    if not auth.lower().startswith("bearer "):
+        return None
+
+    token = auth.split(" ", 1)[1].strip()
+    if not token:
+        return None
+
+    payload = _decode_supabase_jwt(token)
+    if not payload:
+        return None
+    sub = payload.get("sub")
+    return str(sub) if sub else None
+
+
 async def get_user_from_token(
     db: AsyncSession,
     token: str,

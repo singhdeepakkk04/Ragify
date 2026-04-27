@@ -40,6 +40,8 @@ class DocumentChunk(Base):
 
     content = Column(Text, nullable=False)
     embedding = mapped_column(Vector(1536))  # OpenAI text-embedding-3-small
+    embedding_gemini = mapped_column(Vector(768))  # Gemini 2 embedding
+    embedding_provider = Column(String, default="openai")
     chunk_index = Column(Integer)
     page_number = Column(Integer, nullable=True)
     chunk_metadata = Column("metadata", JSON, default={})

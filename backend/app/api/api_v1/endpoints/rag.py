@@ -1,6 +1,6 @@
 
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body, Request
+from fastapi import APIRouter, Depends, HTTPException, Body, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 import time
@@ -13,6 +13,11 @@ from app.core.rag.retrieval import query_project
 from app.core.rate_limiter import enforce_daily_query_quota
 from app.core.guardrails import check_input
 from app.core.query_cache import query_cache
+from app.core.supabase_client import get_supabase_client
+from app.core.tracing import get_langfuse
+from app.services.eval_service import run_ragas_eval_from_artifacts
+from app.services.telemetry_models import RAGRunArtifacts
+from app.services.usage_service import record_usage_from_artifacts
 
 router = APIRouter()
 
@@ -44,6 +49,7 @@ async def query_rag(
     db: AsyncSession = Depends(deps.get_db),
     rag_query: RAGQuery,
     current_user: User = Depends(enforce_daily_query_quota),
+    background_tasks: BackgroundTasks,
 ) -> Any:
     """
     Query the RAG pipeline with caching, guardrails, and rate limiting.
@@ -69,6 +75,21 @@ async def query_rag(
 
     model_used = getattr(project, 'llm_model', 'gpt-3.5-turbo') or 'gpt-3.5-turbo'
 
+    # Telemetry artifacts: populated during streaming; background tasks run after stream ends.
+    artifacts = RAGRunArtifacts(
+        project_id=rag_query.project_id,
+        user_id=current_user.id,
+        supabase_user_id=deps.get_supabase_user_id_from_request(request),
+        query=sanitized_query,
+    )
+
+    supabase = get_supabase_client()
+    langfuse = get_langfuse()
+
+    # Fire-and-forget: these execute after the streaming response completes.
+    background_tasks.add_task(run_ragas_eval_from_artifacts, artifacts, supabase, langfuse)
+    background_tasks.add_task(record_usage_from_artifacts, artifacts, supabase)
+
     try:
         from fastapi.responses import StreamingResponse
         
@@ -79,8 +100,10 @@ async def query_rag(
                 sanitized_query,
                 user_id=current_user.id,
                 model_id=model_used,
+                artifacts=artifacts,
             ),
-            media_type="application/x-ndjson"
+            media_type="application/x-ndjson",
+            background=background_tasks,
         )
     except Exception as e:
         import logging

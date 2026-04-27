@@ -57,6 +57,11 @@ const TYPE_COLORS: Record<string, string> = {
     api: "bg-amber-100 text-amber-700",
 }
 
+function getApiV1BaseUrl(): string {
+    const raw = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+    return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`
+}
+
 /* ── Playground Component (proper React state) ── */
 function PlaygroundSection({ projectId }: { projectId: string }) {
     const [query, setQuery] = useState("")
@@ -65,6 +70,8 @@ function PlaygroundSection({ projectId }: { projectId: string }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isCached, setIsCached] = useState(false)
+
+    const apiV1BaseUrl = getApiV1BaseUrl()
 
     const handleAsk = async () => {
         const q = query.trim()
@@ -80,7 +87,7 @@ function PlaygroundSection({ projectId }: { projectId: string }) {
             const token = await getToken()
             console.log("TEST_TERMINAL token:", token ? "Token acquired" : "Token is null")
             
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/rag/query`, {
+            const response = await fetch(`${apiV1BaseUrl}/rag/query`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -255,9 +262,28 @@ function ConfigurationSection({ project }: { project: Project }) {
     // Form State
     const [formData, setFormData] = useState({
         llm_model: project.llm_model || "gpt-3.5-turbo",
+        embedding_provider: (project as any).embedding_provider || "openai",
+        embedding_model: project.embedding_model || "text-embedding-3-small",
         temperature: project.temperature ?? 0,
         top_k: project.top_k ?? 4,
     })
+
+    const applyEmbeddingProvider = (provider: string) => {
+        // Keep this dead-simple: set the provider and a safe default model.
+        if (provider === "gemini") {
+            setFormData((prev) => ({
+                ...prev,
+                embedding_provider: "gemini",
+                embedding_model: "gemini-embedding-2-preview",
+            }))
+            return
+        }
+        setFormData((prev) => ({
+            ...prev,
+            embedding_provider: "openai",
+            embedding_model: prev.embedding_model?.startsWith("gemini-") ? "text-embedding-3-small" : prev.embedding_model,
+        }))
+    }
 
     const fetchModels = async () => {
         try {
@@ -280,7 +306,8 @@ function ConfigurationSection({ project }: { project: Project }) {
             setIsEditing(false)
             router.refresh()
         } catch (error) {
-            toast.error("Failed to update configuration")
+            const msg: any = (error as any)?.response?.data?.detail || (error as any)?.message || "Failed to update configuration"
+            toast.error(typeof msg === "string" ? msg : JSON.stringify(msg))
         } finally {
             setIsLoading(false)
         }
@@ -345,6 +372,34 @@ function ConfigurationSection({ project }: { project: Project }) {
                             </select>
                             <p className="text-[10px] text-muted-foreground">
                                 Select the model used for response generation.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-mono uppercase text-muted-foreground">Embedding Provider</label>
+                            <select
+                                className="w-full p-2 rounded border border-border bg-background/50 text-sm"
+                                value={(formData as any).embedding_provider}
+                                onChange={(e) => applyEmbeddingProvider(e.target.value)}
+                            >
+                                <option value="openai">OpenAI</option>
+                                <option value="gemini">Gemini</option>
+                            </select>
+                            <p className="text-[10px] text-muted-foreground">
+                                Changing embedding provider requires re-ingesting documents.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-mono uppercase text-muted-foreground">Embedding Model</label>
+                            <input
+                                className="w-full p-2 rounded border border-border bg-background/50 text-sm"
+                                value={(formData as any).embedding_model}
+                                onChange={(e) => setFormData({ ...(formData as any), embedding_model: e.target.value })}
+                                placeholder="text-embedding-3-small"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                                For Gemini embeddings use `gemini-embedding-2-preview`.
                             </p>
                         </div>
 
@@ -546,7 +601,9 @@ export default function ProjectDetailsPage() {
         )
     }
 
-    const curlExample = `curl -X POST "${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/rag/query" \\
+        const apiV1BaseUrl = getApiV1BaseUrl()
+
+    const curlExample = `curl -X POST "${apiV1BaseUrl}/rag/query" \\
   -H "X-API-Key: $YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{

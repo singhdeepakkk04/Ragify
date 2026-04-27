@@ -82,6 +82,17 @@ async def update_project(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """Update a project configuration."""
+    project = await crud_project.get_project(db, project_id=project_id, user_id=current_user.id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project_in.embedding_provider and project_in.embedding_provider != project.embedding_provider:
+        # Check if there are existing documents
+        from app.models.document import Document
+        from sqlalchemy import select
+        result = await db.execute(select(Document.id).where(Document.project_id == project_id).limit(1))
+        if result.scalars().first():
+            raise HTTPException(status_code=409, detail="Changing embedding provider requires re-ingesting all documents. Delete all documents first, then update the provider.")
+
     project = await crud_project.update_project(db, project_id=project_id, project_update=project_in, user_id=current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
