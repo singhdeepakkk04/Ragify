@@ -1,65 +1,95 @@
-# RAGify
+<div align="center">
+  <img src="frontend/public/logo.svg" alt="RAGify Logo" width="120" height="120" />
+  <h1>🚀 RAGify</h1>
+  <p><b>The Production-Grade Multi-Tenant RAG Platform</b></p>
 
-Multi-tenant SaaS platform for production RAG pipelines.
+  <p>
+    <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI" />
+    <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+    <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+    <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  </p>
 
-Upload documents → get a REST endpoint → query in natural language with cited, grounded responses.
+  <h4>"Upload documents → REST endpoint → Natural language answers with citations"</h4>
+</div>
 
-## Features
+---
 
-- Hybrid search — pgvector cosine + BM25, fused with RRF
-- Multi-tenant isolation — user + project separation at every layer
-- Streaming NDJSON — citations first, then token stream
-- Multi-provider LLM — OpenAI, Groq, Sarvam, DeepSeek, ZhipuAI
-- Cohere reranking
-- Redis query cache with project-scoped invalidation
-- Langfuse observability
-- Dual auth — Supabase JWT (frontend) + API key (external consumers)
+## ✨ Overview
 
-## Stack
+**RAGify** is a multi-tenant, production-ready SaaS platform that simplifies the deployment of high-performance RAG (Retrieval-Augmented Generation) pipelines. It handles the complexity of PDF/image parsing, semantic chunking, dual-layer authentication, and hybrid search, providing you with a clean API to query your data.
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | FastAPI, Python 3.11, SQLAlchemy 2 async |
-| Database | PostgreSQL 16 + pgvector |
-| Cache | Redis 7 + Upstash |
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui |
-| Auth | Supabase (email + Google OAuth) |
+## 🔥 Key Features
 
-## Getting started
+- **🌐 Multi-Tenant Architecture** — Full data isolation at the database, cache, and API layers using scoped project IDs.
+- **🧠 Intelligent Query Planning** — LLMs analyze query intent to dynamically plan execution stages and select optimal models.
+- **🔍 Hybrid Vector Search** — Combines `pgvector` Cosine Similarity with state-of-the-art BM25 keyword search using Reciprocal Rank Fusion (RRF).
+- **🖼️ Vision-Powered Parsing** — Automatically extract text and context from Images and PDFs using Gemini Vision models.
+- **⚡ Streaming NDJSON** — Instant response feedback with token-by-token streaming and real-time citation rendering.
+- **📊 Production Monitoring** — Deep visibility into LLM performance and costs via built-in Langfuse tracing.
+- **📏 Automated Evaluation** — Integrated Ragas/Eval framework to validate the correctness and groundedness of every response.
 
-```bash
-cp .env.example .env   # fill in OPENAI_API_KEY, SUPABASE_* values
-bash scripts/start_dev.sh
+## 🛠️ Tech Stack
+
+### Backend & AI
+- **Framework:** FastAPI (Python 3.11)
+- **Database:** PostgreSQL 16 + `pgvector`
+- **Search:** Hybrid (Vector + Keyword) + Cohere Reranking
+- **LLM Registry:** OpenAI, Groq, DeepSeek, Google Gemini, Sarvam
+- **Cache:** Unified Dockerized Redis 7 (Local)
+
+### Frontend
+- **Framework:** Next.js 16 (App Router) + React 19
+- **Styling:** Tailwind CSS v4 + Framer Motion
+- **UI Components:** Shadcn/UI (Radix Primitives)
+- **State Management:** Zustand + React Query
+
+## 🚀 Getting Started
+
+1. **Clone & Setup Environment**
+   ```bash
+   git clone https://github.com/singhdeepakkk04/Ragify.git
+   cd Ragify
+   cp .env.example .env
+   ```
+
+2. **Launch Infrastructure**
+   ```bash
+   # Starts PostgreSQL (pgvector) and Redis in Docker
+   bash scripts/start_dev.sh
+   ```
+
+3. **Access Services**
+   - **Frontend:** [http://localhost:3000](http://localhost:3000)
+   - **Backend API:** [http://localhost:8000](http://localhost:8000)
+   - **Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+## 📁 Repository Structure
+
+```text
+├── backend/            # FastAPI Application & Unit/Integration Tests
+├── frontend/           # Next.js Dashboard & Playground
+├── infrastructure/     # Docker Compose, Nginx Config & Terraform
+├── scripts/            # Admin tools and Dev automation
+├── docs/               # Architecture, Security & Runbooks
+├── sdks/python/        # Official Python Client Library
+└── supabase/           # SQL Migrations for Auth & RLS
 ```
 
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
-- API docs: http://localhost:8000/docs
+## 🛡️ Security & Quality
 
-## Testing
+RAGify is built with a focus on enterprise security:
+- **Dual-Layer Auth:** Supabase JWT for web users + SHA-256 hashed API Keys for external apps.
+- **Pre-commit Integrity:** Automated linting (Ruff), type checking (Mypy), and secret scanning (Gitleaks).
+- **CI/CD:** Automated testing pipelines via GitHub Actions.
 
-```bash
-cd backend && pytest tests/unit/ -v
-cd frontend && npm test
-```
+## 📄 License
 
-## Structure
-ragify/
-├── backend/              FastAPI app + tests
-├── frontend/             Next.js app
-├── infrastructure/       docker-compose, nginx
-├── scripts/              dev + admin scripts
-├── docs/                 architecture, security, runbooks
-├── supabase/             migrations
-└── sdks/python/          Python SDK
+This project is licensed under the **MIT License**.
 
-## Docs
+---
 
-- [Architecture](docs/architecture.md)
-- [Security](docs/security.md)
-- [Contributing](CONTRIBUTING.md)
-
-## License
-
-MIT
-
+<div align="center">
+  <sub>Built with ❤️ by the RAGify Team</sub>
+</div>
