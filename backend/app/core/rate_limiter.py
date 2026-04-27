@@ -24,13 +24,15 @@ if settings.REDIS_URL.startswith("rediss://") and settings.REDIS_VERIFY_SSL:
 elif settings.REDIS_URL.startswith("rediss://"):
     _redis_ssl = ssl._create_unverified_context()
 
-redis_client = redis.from_url(
-    settings.REDIS_URL,
-    decode_responses=True,
-    username=(settings.REDIS_USERNAME or None),
-    password=(settings.REDIS_PASSWORD or None),
-    ssl=_redis_ssl,
-)
+_redis_kwargs: dict = {
+    "decode_responses": True,
+    "username": (settings.REDIS_USERNAME or None),
+    "password": (settings.REDIS_PASSWORD or None),
+}
+if _redis_ssl is not None:
+    _redis_kwargs["ssl"] = _redis_ssl
+
+redis_client = redis.from_url(settings.REDIS_URL, **_redis_kwargs)
 
 # Default rate limits per category
 WINDOW_SECONDS = settings.RATE_LIMIT_WINDOW_SECONDS

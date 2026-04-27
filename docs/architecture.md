@@ -44,7 +44,9 @@ Upload your documents → Get a REST API endpoint → Query your documents in na
 | Reranking | Cohere cross-encoder reranking for precision improvement |
 | Streaming | NDJSON streaming responses for low time-to-first-byte |
 | Multi-provider LLM | OpenAI, Groq, Sarvam, DeepSeek, ZhipuAI — all via unified registry |
-| Caching | Upstash Redis (30-min TTL) + in-memory LRU fallback |
+| Query Planning | LLM assesses query importance and dynamically plans execution stages |
+| RAG Evaluation | Output validation via automated evaluation frameworks (Ragas / Evals) |
+| Caching & Limits | Dockerized Redis for both Rate Limiting and Query Cache |
 | Observability | Langfuse LLM tracing for all pipeline stages |
 
 ---
@@ -65,24 +67,26 @@ graph TB
     subgraph "Application Layer"
         FastAPI["⚡ FastAPI Backend\n(Python 3.11 / uvicorn)"]
         
-        subgraph "Middleware Stack"
+        subgraph "Middleware & Core"
             CORS["CORS Middleware"]
             AuthDep["Auth Dependency\n(JWT / API Key)"]
-            RateLimit["Rate Limiter\n(Redis Sliding Window)"]
-            Guardrails["Content Guardrails\n(Blocklist + Injection)"]
+            RateLimit["Rate Limiter\n(Local Redis)"]
+            Guardrails["Content Guardrails"]
+            QueryPlanner["Query Planner\n(Assesses Importance & Stages)"]
         end
     end
 
     subgraph "Data Layer"
         PG["🐘 PostgreSQL 16\n+ pgvector extension"]
-        Redis["⚡ Redis 7\n(Rate Limits + Cache)"]
+        Redis["⚡ Redis 7 (Docker)\n(Rate Limits + Cache)"]
     end
 
     subgraph "AI / External Services"
-        OpenAI["🤖 OpenAI API\n(Embeddings + GPT models)"]
+        OpenAI["🤖 OpenAI / Gemini\n(Embeddings + Models)"]
         Cohere["🔄 Cohere API\n(Reranking)"]
         Groq["⚡ Groq\n(Fast LLM inference)"]
-        Langfuse["📊 Langfuse\n(LLM Observability)"]
+        Ragas["📏 Ragas / Evals\n(Output Evaluation)"]
+        Langfuse["📊 Langfuse\n(Tracing)"]
     end
 
     Browser -- "HTTPS + Supabase JWT" --> FastAPI
@@ -95,6 +99,7 @@ graph TB
     FastAPI --> OpenAI
     FastAPI --> Cohere
     FastAPI --> Groq
+    FastAPI --> Ragas
     FastAPI --> Langfuse
 ```
 
@@ -112,16 +117,17 @@ graph TB
 | Migrations | Alembic | Database schema versioning |
 | DB Driver | asyncpg | Async PostgreSQL driver |
 | Vector Store | pgvector 0.7+ | 1536-dim vector storage + cosine similarity |
-| Embeddings | OpenAI `text-embedding-3-small` | 1536-dimension dense embeddings |
+| Embeddings | Dynamic (OpenAI / Gemini) | Decided via project survey configuration |
 | LLM Orchestration | LangChain | Prompt templates, chains, streaming |
+| Query Planning | Custom Planner | Predicts execution stages based on natural language |
+| RAG Evaluation | Ragas / Custom Evals | Evaluates generation correctness and context use |
 | Reranking | Cohere `rerank-v3.5` | Cross-encoder re-ranking |
-| Cache | Redis (Upstash) | Query result cache, TTL-based |
-| Rate Limiting | Redis (docker local) | Sliding window per user |
+| Cache & Limits | Redis 7 (Docker) | Rate limiting and Query caching (consolidated) |
 | Auth Verification | PyJWT | JWT decode + HS256/ES256 verification |
 | Password Hashing | passlib + bcrypt | Secure password storage |
 | Tracing | Langfuse | LLM pipeline observability |
-| Document Parsing | pypdf, python-docx | PDF and DOCX text extraction |
-| Text Splitting | LangChain `RecursiveCharacterTextSplitter` | Chunk generation |
+| Document Parsing | pypdf, python-docx, Gemini Vision | PDF, DOCX, TXT, Images |
+| Text Splitting | Dynamic Strategies | Sequential, Fixed Size, or Semantic Chunking |
 
 ### Frontend
 
@@ -142,12 +148,12 @@ graph TB
 
 ### Infrastructure
 
-| Component | Technology | Notes |
+| Infrastructure | Technology | Notes |
 |---|---|---|
 | Database | PostgreSQL 16 (pgvector/pgvector:pg16 image) | Vector + relational in one |
-| Cache/Rate Limit | Redis 7 Alpine | Local Docker |
-| Cloud Cache | Upstash Redis | Serverless Redis for query cache |
+| Cache / Rate Limit | Redis 7 Alpine | Local Docker (unified for all ops) |
 | Container Runtime | Docker Compose | Local/dev orchestration |
+| Auth Service | Supabase | Managed auth (email, Google OAuth) |
 | Auth Service | Supabase | Managed auth (email, Google OAuth) |
 
 ---
@@ -315,16 +321,18 @@ sequenceDiagram
     participant Client
     participant API as FastAPI /rag/query
     participant Guard as Guardrails
+    participant Planner as Query Planner
     participant Cache as Query Cache
-    participant Expand as Query Expansion (LLM)
-    participant Search as Hybrid Search (PG)
+    participant Expand as Query Expansion
+    participant Search as Hybrid Search
     participant Rerank as Cohere Reranker
-    participant LLM as LLM (streaming)
+    participant LLM as Multi-Model LLM
+    participant Eval as Ragas Eval
     participant Langfuse
 
     Client->>API: POST /rag/query {project_id, query, top_k}
     API->>Guard: check_input(query)
-    Guard-->>API: sanitized_query / 400 if blocked
+    Guard-->>API: sanitized_query / 400
 
     API->>Cache: get(user_id, project_id, query)
     alt Cache HIT
@@ -333,23 +341,26 @@ sequenceDiagram
     else Cache MISS
         Cache-->>API: None
 
+        API->>Langfuse: trace.span("query_planning")
+        API->>Planner: plan_stages(query)
+        Planner-->>API: {importance, routing, stages}
+
         API->>Langfuse: trace.span("query_expansion")
-        API->>Expand: expand_query(query) → GPT-3.5
-        Expand-->>API: [original, alt1, alt2, alt3]
+        API->>Expand: expand_query(query)
+        Expand-->>API: [original, alt1, ...altN]
 
         API->>Langfuse: trace.span("hybrid_search")
-        par Parallel for each query variation
-            API->>Search: embed_query(q) → OpenAI
-            Search-->>API: embedding vector
-            API->>Search: Vector cosine search (pgvector <=>)
-            API->>Search: BM25 keyword search (tsvector @@)
+        par Parallel for each query
+            API->>Search: embed_query(q) → Dynamic (OpenAI/Gemini)
+            Search-->>API: vector
+            API->>Search: Vector cosine + BM25 search
         end
-        Search-->>API: All results (up to 4×top_k chunks)
+        Search-->>API: All results
 
-        API->>API: RRF Fusion (Reciprocal Rank Fusion)\nDedup by chunk ID
+        API->>API: RRF Fusion & deduplication
 
         API->>Langfuse: trace.span("reranking")
-        API->>Rerank: rerank(query, chunks, top_n=7)
+        API->>Rerank: rerank(query, chunks)
         Rerank-->>API: reranked_chunks
 
         API-->>Client: Stream: {"citations": [...]}
@@ -361,7 +372,11 @@ sequenceDiagram
             API-->>Client: Stream: {"token": "..."}
         end
 
-        API->>Cache: set(user_id, project_id, query, {answer, citations})
+        API->>Langfuse: trace.span("ragas_evaluation")
+        API->>Eval: evaluate(query, answer, context)
+        Eval-->>API: {correctness_score, groundedness_score}
+
+        API->>Cache: set(user, project, query, {answer, citations})
         API->>Langfuse: flush()
     end
 ```
@@ -385,11 +400,13 @@ sequenceDiagram
     API->>API: Verify project ownership (owner_id == current_user.id)
     API->>API: Check file size ≤ 20 MB
     
-    alt file.endswith(".pdf")
+    alt file is PDF
         API->>Parser: pypdf.PdfReader → extract per-page text
-    else file.endswith(".docx")
+    else file is DOCX
         API->>Parser: python-docx → extract paragraph text
-    else file.endswith(".txt" | ".md")
+    else file is Image (JPG/PNG)
+        API->>Parser: Gemini Vision Model → OCR & describe
+    else file is TXT/MD
         API->>Parser: decode UTF-8
     end
     
@@ -405,14 +422,16 @@ sequenceDiagram
     
     BG->>DB: UPDATE documents SET status = 'processing'
     
+    BG->>BG: Load project config (embedding & chunking survey choices)
+    
     loop For each page
-        BG->>Splitter: RecursiveCharacterTextSplitter(chunk_size=1000, overlap=200)
+        BG->>Splitter: Dynamic Chunking (Sequential / Fixed / Semantic)
         Splitter-->>BG: [chunk1, chunk2, ...]
     end
     
-    BG->>OpenAI: embeddings.create(model="text-embedding-3-small", input=all_chunks)
+    BG->>OpenAI: Dynamic Embeddings (OpenAI / Gemini)
     Note over BG,OpenAI: Batched: 100 chunks per API call
-    OpenAI-->>BG: [[float x 1536], ...] 
+    OpenAI-->>BG: [[float x N], ...] 
     
     loop For each chunk
         BG->>DB: INSERT INTO document_chunks<br>(content, embedding:Vector(1536),<br>user_id, project_id, page_number, chunk_metadata)
