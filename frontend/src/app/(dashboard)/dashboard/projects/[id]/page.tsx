@@ -207,7 +207,7 @@ function PlaygroundSection({ projectId }: { projectId: string }) {
                                     </Badge>
                                 </div>
                             )}
-                            <div className="text-sm leading-relaxed text-foreground/90 prose prose-sm prose-invert max-w-none">
+                            <div className="text-sm leading-relaxed text-foreground/90 prose prose-sm dark:prose-invert max-w-none">
                                 {answer ? (
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                         {answer}

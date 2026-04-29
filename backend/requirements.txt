@@ -120,3 +120,4 @@ aiosqlite==0.21.0
 google-genai
 ragas>=0.2
 datasets
+langchain-text-splitters

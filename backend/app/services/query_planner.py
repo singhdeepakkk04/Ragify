@@ -18,21 +18,20 @@ class QueryPlan:
 
 _classifier_semaphore = asyncio.Semaphore(10)
 
-async def _classify_query_gemini(query: str) -> str:
-    """Use Gemini Flash to classify query complexity."""
-    try:
-        import google.genai as genai
-        from google.genai import types
-    except Exception as e:
-        logger.warning(f"[Query Planner] google-genai not available ({e}). Defaulting to 'balanced'.")
-        return "balanced"
-
+async def _classify_query_groq(query: str) -> str:
+    """Use Groq (Llama 3) to classify query complexity."""
     from app.core.config import settings
-
-    if not settings.GEMINI_API_KEY:
+    
+    if not settings.GROQ_API_KEY:
+        logger.warning("[Query Planner] GROQ_API_KEY not set. Defaulting to 'balanced'.")
         return "balanced"
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(
+        api_key=settings.GROQ_API_KEY,
+        base_url="https://api.groq.com/openai/v1",
+        timeout=2.0
+    )
 
     prompt = f"""You are a query complexity classifier. Respond with ONLY one word.
     
@@ -49,28 +48,21 @@ async def _classify_query_gemini(query: str) -> str:
 
     try:
         async with _classifier_semaphore:
-            # Wrap synchronous genai SDK in to_thread, with a 500ms timeout
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    client.models.generate_content,
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        max_output_tokens=5,
-                        temperature=0.0
-                    )
-                ),
-                timeout=0.5
+            response = await client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=5,
+                temperature=0.0
             )
-            val = response.text.strip().lower()
+            val = response.choices[0].message.content.strip().lower()
             if val in ("fast", "balanced", "thorough"):
                 return val
             return "balanced"
     except asyncio.TimeoutError:
-        logger.warning("[Query Planner] Gemini classification timed out. Defaulting to 'balanced'.")
+        logger.warning("[Query Planner] Groq classification timed out. Defaulting to 'balanced'.")
         return "balanced"
     except Exception as e:
-        logger.error(f"[Query Planner] Gemini classification failed: {e}. Defaulting to 'balanced'.")
+        logger.error(f"[Query Planner] Groq classification failed: {e}. Defaulting to 'balanced'.")
         return "balanced"
 
 async def plan_query(query: str, project: Project) -> QueryPlan:
@@ -87,8 +79,8 @@ async def plan_query(query: str, project: Project) -> QueryPlan:
         tier = "thorough"
         reasoning = "project configured for 'thorough' strategy"
     else:
-        tier = await _classify_query_gemini(query)
-        reasoning = "classified by gemini-2.5-flash"
+        tier = await _classify_query_groq(query)
+        reasoning = "classified by groq-llama-3.1-8b"
 
     # Default logic limits web search to "thorough" tier or if explicitly preferred, 
     # but the prompt says tier specifies it via "thorough=expansion+rerank+web", 

@@ -66,7 +66,10 @@ async def record_usage(record: UsageRecord, supabase) -> None:
             }
         ).execute()
     except Exception as e:
-        logger.error(f"[Usage] Usage recording failed: {e}")
+        if "PGRST205" in str(e) or "Could not find the table" in str(e):
+            logger.warning("[Usage] 'query_usage' table not found in Supabase. Telemetry skipped.")
+        else:
+            logger.error(f"[Usage] Usage recording failed: {e}")
 
 
 async def record_usage_from_artifacts(artifacts: RAGRunArtifacts, supabase) -> None:

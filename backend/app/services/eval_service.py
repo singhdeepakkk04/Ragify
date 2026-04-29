@@ -26,7 +26,7 @@ async def run_ragas_eval(payload: EvalPayload, supabase, langfuse) -> None:
     """Runs RAGAS metrics async in the background.
 
     Never call this in the request path — schedule with BackgroundTasks.
-    Uses Gemini 2.5 Flash as the eval LLM.
+    Uses Groq (Llama 3.1 8B) via LangchainLLMWrapper for evaluation.
     """
 
     if not payload or not payload.trace_id:
@@ -40,37 +40,33 @@ async def run_ragas_eval(payload: EvalPayload, supabase, langfuse) -> None:
     try:
         from ragas import evaluate
         from ragas.metrics import Faithfulness, ResponseRelevancy, LLMContextPrecisionWithoutReference
-        from ragas.llms import BaseRagasLLM
+        from ragas.llms import LangchainLLMWrapper
+        from langchain_openai import ChatOpenAI
         from datasets import Dataset
     except Exception as e:
-        logger.error(f"[Eval] Missing RAGAS deps: {e}")
+        logger.warning(f"[Eval] Missing RAGAS deps: {e}")
         return
 
-    if not settings.GEMINI_API_KEY:
-        logger.warning("[Eval] GEMINI_API_KEY not set — skipping RAGAS eval")
+    if not settings.GROQ_API_KEY:
+        logger.warning("[Eval] GROQ_API_KEY not set — skipping RAGAS eval")
         return
 
-    class GeminiRagasLLM(BaseRagasLLM):
-        def __init__(self):
-            import google.genai as genai
-
-            self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
-        def generate_text(self, prompt: str) -> str:
-            # RAGAS may call the sync variant internally.
-            response = self._client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            return getattr(response, "text", "") or ""
-
-        async def agenerate_text(self, prompt: str) -> str:
-            # Keep eval fully async from the server POV.
-            return await asyncio.to_thread(self.generate_text, prompt)
+    # RAGAS metrics rely on default embeddings (OpenAI) which require the env var.
+    import os
+    if settings.OPENAI_API_KEY:
+        os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+    if settings.GROQ_API_KEY:
+        os.environ["GROQ_API_KEY"] = settings.GROQ_API_KEY
 
     async with _eval_semaphore:
         try:
-            eval_llm = GeminiRagasLLM()
+            eval_chat_model = ChatOpenAI(
+                model="llama-3.1-8b-instant",
+                api_key=settings.GROQ_API_KEY,
+                base_url="https://api.groq.com/openai/v1",
+                temperature=0.0,
+            )
+            eval_llm = LangchainLLMWrapper(eval_chat_model)
 
             metrics = [
                 Faithfulness(llm=eval_llm),
@@ -86,7 +82,7 @@ async def run_ragas_eval(payload: EvalPayload, supabase, langfuse) -> None:
                 }
             )
 
-            result = evaluate(dataset=ds, metrics=metrics)
+            result = await asyncio.to_thread(evaluate, dataset=ds, metrics=metrics)
             row = result.to_pandas().iloc[0]
 
             scores = {
@@ -108,17 +104,23 @@ async def run_ragas_eval(payload: EvalPayload, supabase, langfuse) -> None:
 
             # Push to Supabase for dashboard queries
             if supabase:
-                supabase.table("eval_results").insert(
-                    {
-                        "project_id": payload.project_id,
-                        "trace_id": payload.trace_id,
-                        "query_text": (payload.query or "")[:500],
-                        "faithfulness": scores["faithfulness"],
-                        "answer_relevancy": scores["answer_relevancy"],
-                        "context_precision": scores["context_precision"],
-                        "query_tier": payload.query_tier,
-                    }
-                ).execute()
+                try:
+                    supabase.table("eval_results").insert(
+                        {
+                            "project_id": payload.project_id,
+                            "trace_id": payload.trace_id,
+                            "query_text": (payload.query or "")[:500],
+                            "faithfulness": scores["faithfulness"],
+                            "answer_relevancy": scores["answer_relevancy"],
+                            "context_precision": scores["context_precision"],
+                            "query_tier": payload.query_tier,
+                        }
+                    ).execute()
+                except Exception as sup_err:
+                    if "PGRST205" in str(sup_err) or "Could not find the table" in str(sup_err):
+                        logger.warning("[Eval] 'eval_results' table not found in Supabase. Skipped.")
+                    else:
+                        logger.error(f"[Eval] Supabase insert failed: {sup_err}")
 
             logger.info(f"[Eval] RAGAS eval done for {payload.trace_id}: {scores}")
 
