@@ -61,6 +61,11 @@ if prompt := st.chat_input("Ask a question about your documents..."):
         citations = []
         
         try:
+            # Ensure the URL points to the exact endpoint
+            final_url = api_url.strip()
+            if not final_url.endswith("/api/v1/rag/query"):
+                final_url = final_url.rstrip("/") + "/api/v1/rag/query"
+
             # Send streaming request to RAGify backend
             headers = {
                 "X-API-Key": api_key,
@@ -71,7 +76,7 @@ if prompt := st.chat_input("Ask a question about your documents..."):
                 "query": prompt
             }
             
-            with requests.post(api_url, json=payload, headers=headers, stream=True) as response:
+            with requests.post(final_url, json=payload, headers=headers, stream=True) as response:
                 if response.status_code != 200:
                     st.error(f"Error {response.status_code}: {response.text}")
                     st.stop()
